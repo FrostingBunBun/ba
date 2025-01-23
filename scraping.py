@@ -51,10 +51,11 @@ news_list = extract_news_from_url(url)
 
 if news_list:
     print("\nExtracted News:")
-    for news_item in news_list:
+    for index, news_item in enumerate(news_list):
 
         headline, link, img_url = news_item
+        print(index + 1)
         print(f"Title: {shorten_string(headline, max_length=999)}")
-        print(f"Link: {shorten_string(link, max_length=30)}")
+        print(f"Link: {link}")
         print(f"Image: {shorten_string(img_url, max_length=30)}")
         print()
