@@ -26,7 +26,15 @@ def extractContent(link):
             return {"error": "Failed to fetch page"}
 
         soup = BeautifulSoup(htmlContent, 'html.parser')
-        titleTag = soup.find('h1', class_='FXa-')
+        
+        # Try to find the <h1> tag - more flexible search
+        titleTag = soup.find('h1')
+        
+        # If no <h1> tag found, log a warning
+        if not titleTag:
+            logging.warning("No <h1> tag found, looking for title in other tags...")
+            titleTag = soup.find('title')  # Try the <title> tag as a fallback
+        
         article = soup.find('article', id='main-content')
 
         if not article:
@@ -75,8 +83,5 @@ def getPageData(link):
     
     return f"Title: {result['title']}\n\nContent: {result['content']}"
 
-
-
-result = getPageData('https://wiadomosci.wp.pl/spiecie-miedzy-poslami-w-programie-niech-pan-zajrzy-do-monitoringu-7117605652384576a')
+result = getPageData('https://wiadomosci.wp.pl/przymusowe-doprowadzenie-ziobry-zapowiadaja-wniosek-o-areszt-w-przypadku-unikow-7119825509657408a')
 print(result)
-
