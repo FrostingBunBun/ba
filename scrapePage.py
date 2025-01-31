@@ -83,5 +83,5 @@ def getPageData(link):
     
     return f"Title: {result['title']}\n\nContent: {result['content']}"
 
-result = getPageData('https://wiadomosci.wp.pl/przymusowe-doprowadzenie-ziobry-zapowiadaja-wniosek-o-areszt-w-przypadku-unikow-7119825509657408a')
-print(result)
+# result = getPageData('https://wiadomosci.wp.pl/przymusowe-doprowadzenie-ziobry-zapowiadaja-wniosek-o-areszt-w-przypadku-unikow-7119825509657408a')
+# print(result)
