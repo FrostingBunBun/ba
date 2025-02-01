@@ -1,33 +1,39 @@
-import sqlite3
 import requests
 from bs4 import BeautifulSoup
+import time
+import os
 
 # Constants
-DB_FILE = "news.db"
-MAX_ARTICLES = 5
 URL = "https://wiadomosci.wp.pl/polska"
+MAX_ARTICLES = 25  # Fetch all articles from the page
+MAX_PROCESSED_LINKS = 100  # Maximum number of links to store in the file
+PROCESSED_FILE = "processed_articles.txt"  # File to store processed article links
 
-# Create the database and table if they don't exist
-def createDb():
+def loadProcessedArticles():
+    """Load the list of processed article links from the file."""
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS news (
-                    title TEXT UNIQUE,
-                    link TEXT UNIQUE
-                )
-            """)
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        raise
+        with open(PROCESSED_FILE, "r") as file:
+            return file.read().splitlines()  # Return a list of links
+    except FileNotFoundError:
+        return []
 
-# Fetch the latest news from the website
+def saveProcessedArticles(processed_articles):
+    """Save the list of processed article links to the file, keeping only the most recent MAX_PROCESSED_LINKS."""
+    # Keep only the most recent MAX_PROCESSED_LINKS links
+    if len(processed_articles) > MAX_PROCESSED_LINKS:
+        processed_articles = processed_articles[-MAX_PROCESSED_LINKS:]
+
+    with open(PROCESSED_FILE, "w") as file:
+        for link in processed_articles:
+            file.write(link + "\n")
+
 def fetchLatestNews():
+    """Fetch the latest news articles from the website."""
     try:
-        response = requests.get(URL, timeout=10)  # Add timeout for robustness
-        response.raise_for_status()  # Raise an error for bad status codes
+        response = requests.get(URL, timeout=10)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        newsBlocks = soup.find_all('div', class_='f2eMLotm')[:MAX_ARTICLES]
+        newsBlocks = soup.find_all('div', class_='f2eMLotm')[:MAX_ARTICLES]  # Fetch all articles
         latestNews = []
 
         for block in newsBlocks:
@@ -50,52 +56,25 @@ def fetchLatestNews():
         print(f"Unexpected error while fetching news: {e}")
         return []
 
-# Get the current articles from the database
-def getDbArticles():
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.execute("SELECT title, link FROM news")
-            return [{"title": row[0], "link": row[1]} for row in cursor]
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+def getNewArticles():
+    """Compare the latest articles with the processed list and return new articles."""
+    # Load processed articles
+    processed_articles = loadProcessedArticles()
+
+    # Fetch the latest articles
+    latest_articles = fetchLatestNews()
+    if not latest_articles:
         return []
 
-# Update the database with new articles
-def updateDb(newArticles):
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            # Insert new articles
-            for article in newArticles:
-                conn.execute("INSERT OR IGNORE INTO news (title, link) VALUES (?, ?)", (article["title"], article["link"]))
+    # Find new articles
+    new_articles = [article for article in latest_articles if article["link"] not in processed_articles]
 
-            # Delete older articles beyond MAX_ARTICLES
-            conn.execute(f"DELETE FROM news WHERE rowid NOT IN (SELECT rowid FROM news ORDER BY rowid DESC LIMIT {MAX_ARTICLES})")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        raise
+    # Update the processed articles list
+    for article in new_articles:
+        processed_articles.append(article["link"])  # Add new links to the end of the list
 
-def syncNews():
-    try:
-        createDb()
-        latestNews = fetchLatestNews()
-        if not latestNews:
-            return []
+    # Save the updated list of processed articles
+    saveProcessedArticles(processed_articles)
 
-        dbArticles = getDbArticles()
-        dbLinks = {article["link"] for article in dbArticles}  # Use a set of links for comparison
-        newArticles = [article for article in latestNews if article["link"] not in dbLinks]
+    return new_articles
 
-        if newArticles:
-            updateDb(newArticles)
-
-        return newArticles
-    except Exception as e:
-        print(f"Unexpected error in syncNews: {e}")
-        return []
-
-
-# if __name__ == "__main__":
-#     newArticles = syncNews()
-
-#     print('newArtiucles: ', newArticles)
-#     print("LEN: ", len(newArticles))

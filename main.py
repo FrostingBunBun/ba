@@ -1,69 +1,78 @@
 import time
-import schedule
-import pytz
-from datetime import datetime
 import telebot
 from dotenv import load_dotenv
 import os
+import logging
+from databaseSync import getNewArticles  # Import the getNewArticles function from datasync.py
+from scrapePage import getPageData  # Import the getPageData function from scrapePage.py
 
-
+# Load environment variables
 load_dotenv()
 
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s: %(message)s'
+)
+
+# Load bot token and user ID from environment variables
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 USER_ID = os.getenv('USER_ID')
 
 if not BOT_TOKEN or not USER_ID:
     raise ValueError("BOT_TOKEN or USER_ID is not set in the environment variables.")
 
+# Initialize the bot
 bot = telebot.TeleBot(BOT_TOKEN)
 
-WARSAW_TZ = pytz.timezone('Europe/Moscow')
-
-# List of target times in HH:MM format
-TARGET_TIMES = ["10:57", "11:00", "15:30", "20:00"]
-
-def sendScheduledMessage():
+def sendArticleToChannel(article):
+    """Send an article's content to the Telegram channel, truncating it to the first 10 characters."""
     try:
-        bot.send_message(USER_ID, f"Sent at {datetime.now(WARSAW_TZ)}")
-        print("[INFO] Message sent successfully.")
-    except Exception as e:
-        print(f"[ERROR] Failed to send message: {e}")
+        # Scrape the article's content using scrapePage.py
+        articleContent = getPageData(article["link"])
+        if not articleContent:
+            logging.error(f"Failed to scrape content for article: {article['title']}")
+            return
 
-def checkAndRunTask():
-    try:
-        now = datetime.now(WARSAW_TZ)
-        currentTime = now.strftime("%H:%M")
-        print(f"[DEBUG] Current time: {currentTime}")
-        
-        if currentTime in TARGET_TIMES:
-            print(f"[INFO] Target time {currentTime} reached. Sending message.")
-            sendScheduledMessage()
-        else:
-            print(f"[DEBUG] No matching target time. {TARGET_TIMES}")
+        # Truncate the content to the first 10 characters
+        truncatedContent = articleContent[:20] + "..." if len(articleContent) > 10 else articleContent
+
+        # Prepare the message with the title and truncated content
+        message = f"**{article['title']}**\n\n{truncatedContent}"
+
+        # Send the message
+        bot.send_message(USER_ID, message)
+        logging.info(f"Sent article to channel: {article['title']}")
+
     except Exception as e:
-        print(f"[ERROR] Failed during time check: {e}")
+        logging.error(f"Failed to send article to channel: {e}")
 
 def main():
-    """Main function to schedule tasks and run the bot."""
-    print("[INFO] Bot started and running...")
-    
-    # Schedule the time check task every minute
-    schedule.every().minute.do(checkAndRunTask)
+    """Main function to run the bot in an infinite loop."""
+    logging.info("Bot started and running...")
 
     try:
         while True:
             try:
-                schedule.run_pending()
+                # Fetch new articles using datasync.py
+                newArticles = getNewArticles()
+                if not newArticles:
+                    logging.info("No new articles found.")
+                else:
+                    logging.info(f"Found {len(newArticles)} new articles.")
+                    for article in newArticles:
+                        sendArticleToChannel(article)
             except Exception as e:
-                print(f"[ERROR] An error occurred while running scheduled tasks: {e}")
-            
-            time.sleep(1)  # Prevent excessive CPU usage
+                logging.error(f"Error during article check: {e}")
+
+            # Wait for 5 seconds before the next check
+            time.sleep(5)
     except KeyboardInterrupt:
-        print("\n[INFO] Bot stopped gracefully.")
+        logging.info("Bot stopped gracefully.")
     except Exception as e:
-        print(f"[CRITICAL] An unexpected error occurred: {e}")
+        logging.error(f"Unexpected error: {e}")
     finally:
-        print("[INFO] Exiting program.")
+        logging.info("Exiting program.")
 
 if __name__ == "__main__":
     main()
