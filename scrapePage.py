@@ -81,7 +81,7 @@ def getPageData(link):
         logging.error(result["error"])
         return None
     
-    return f"Title: {result['title']}\n\nContent: {result['content']}"
+    return f"'Title: {result['title']}, Content: {result['content']}'"
 
-# result = getPageData('https://wiadomosci.wp.pl/przymusowe-doprowadzenie-ziobry-zapowiadaja-wniosek-o-areszt-w-przypadku-unikow-7119825509657408a')
+# result = getPageData('https://wiadomosci.wp.pl/czolowe-zderzenie-i-dachowanie-za-kierownica-20-latek-7120719323319104a')
 # print(result)
