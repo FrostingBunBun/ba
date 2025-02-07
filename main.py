@@ -32,9 +32,19 @@ bot = telebot.TeleBot(BOT_TOKEN)
 # Runtime queue to store articles awaiting moderation
 moderation_queue = []
 
+def filterGptAd(text):
+    sections = text.strip().split("\n\n")
+    if len(sections) > 1:
+        print("detected ad, removing")
+        return "\n\n".join(sections[1:])
+    return text
+
 def sendArticleToModerator(articleContent, image_url, article_id):
     """Send an article's content and image to the moderator with Yes/No buttons."""
     try:
+        # Filter out any potential advertisement
+        articleContent = filterGptAd(articleContent)
+
         # Create an inline keyboard with Yes and No buttons
         markup = InlineKeyboardMarkup()
         yes_button = InlineKeyboardButton("✅ Yes", callback_data=f"approve_{article_id}")
